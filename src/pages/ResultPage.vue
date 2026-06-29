@@ -17,7 +17,7 @@
 
     <div class="actions">
       <van-button v-if="result?.outcome === 'retake'" block type="primary" size="large" @click="goRetake">重新拍摄</van-button>
-      <van-button v-else-if="result?.outcome === 'confirm'" block type="primary" size="large" @click="goConfirm">返回核对</van-button>
+      <van-button v-else-if="result?.outcome === 'confirm'" block type="primary" size="large" @click="goConfirm">处理不一致</van-button>
       <van-button v-else-if="result?.outcome === 'retry'" block type="primary" size="large" @click="goRetry">重新提交</van-button>
       <van-button v-else block type="primary" size="large" @click="goProgress">查询进度</van-button>
       <van-button block plain type="primary" @click="goHome">返回首页</van-button>
@@ -39,7 +39,7 @@ const result = computed(() => store.submitResult);
 const title = computed(() => {
   if (!result.value) return '暂无提交结果';
   if (result.value.outcome === 'retake') return '请重新拍摄';
-  if (result.value.outcome === 'confirm') return '请重新核对';
+  if (result.value.outcome === 'confirm') return '信息需要核对';
   if (result.value.outcome === 'retry') return '请稍后重试';
   return result.value.tempNo ? '报名已通过初核' : '报名已提交';
 });
@@ -48,6 +48,7 @@ const subtitle = computed(() => {
   if (!result.value) return '当前没有可展示的提交结果。';
   if (result.value.outcome === 'submitted' && result.value.tempNo) return '请保存临时编号，并继续关注进度。';
   if (result.value.outcome === 'submitted') return '资料已进入核验流程，请稍后查询进度。';
+  if (result.value.outcome === 'confirm') return '后端核验结果与你填写的信息不一致，请返回核对并选择处理方式。';
   return result.value.hint || '请按页面提示处理后再次提交。';
 });
 

@@ -11,7 +11,7 @@
         <h2 class="section-title">手机验证</h2>
         <van-cell-group inset>
           <van-field v-model="draft.phone" label="手机号" type="tel" maxlength="11" placeholder="大陆手机号" />
-          <van-field v-model="draft.code" label="验证码" type="tel" maxlength="6" placeholder="6 位数字">
+          <van-field v-model="smsCode" label="验证码" type="tel" maxlength="6" placeholder="6 位数字">
             <template #button>
               <van-button size="small" type="primary" :disabled="sendDisabled" :loading="sending" @click="sendCode">
                 {{ countdown > 0 ? `${countdown}s` : '获取' }}
@@ -26,7 +26,7 @@
           {{
             store.hasVerifiedPhone
               ? '手机号已验证，本次报名会使用该手机号身份链。'
-              : '当前本地后端没有开放报名轮次时可能无法发送验证码；资料可先填写，最终提交仍需要 phoneVerificationToken。'
+              : phoneVerificationNotice
           }}
         </div>
       </section>
@@ -195,6 +195,7 @@ const store = useRecruitmentStore();
 const draft = store.draft;
 const sending = ref(false);
 const verifying = ref(false);
+const smsCode = ref('');
 const countdown = ref(0);
 const relationPicker = ref({ show: false, index: 0 });
 const educationPicker = ref(false);
@@ -226,9 +227,21 @@ const educationActions: OptionItem[] = [
 ];
 
 const sendDisabled = computed(() => sending.value || countdown.value > 0 || !isPhone(draft.phone));
+const phoneVerificationNotice = computed(() => {
+  if (draft.verifiedPhone && draft.verifiedPhone !== draft.phone.trim()) {
+    return '手机号已变更，请重新验证。';
+  }
+  if (draft.token && draft.verifiedPhone === draft.phone.trim()) {
+    return '手机验证已过期，请重新获取验证码。';
+  }
+  return '请先完成手机号验证；后端提交要求有效的 phoneVerificationToken。';
+});
+
+store.refreshVerificationClock();
 
 function getMissingMessage(): string {
   if (!isPhone(draft.phone)) return '请填写正确手机号';
+  if (!store.hasVerifiedPhone) return phoneVerificationNotice.value;
   if (!draft.realName.trim()) return '请填写姓名';
   if (!isMainlandId(draft.idCardNumber)) return '请填写正确身份证号';
   if (!draft.cityDistrict.trim()) return '请填写所在区县';
@@ -280,14 +293,15 @@ async function sendCode() {
 }
 
 async function verifyCode() {
-  if (!isPhone(draft.phone) || !isSmsCode(draft.code)) {
+  if (!isPhone(draft.phone) || !isSmsCode(smsCode.value)) {
     showToast('请输入手机号和 6 位验证码');
     return;
   }
   verifying.value = true;
   try {
-    const result = await verifyRecruitmentCode(draft.phone.trim(), draft.code.trim());
-    store.setToken(result.phoneVerificationToken, result.expiresAt);
+    const phone = draft.phone.trim();
+    const result = await verifyRecruitmentCode(phone, smsCode.value.trim());
+    store.setToken(phone, result.phoneVerificationToken, result.expiresAt);
     showToast('验证通过');
   } catch (error) {
     showToast(error instanceof FriendlyApiError ? error.message : '验证失败');
@@ -330,6 +344,7 @@ function selectEducation(action: OptionItem) {
 }
 
 function continueNext() {
+  store.refreshVerificationClock();
   const missingMessage = getMissingMessage();
   if (missingMessage) {
     showToast(missingMessage);

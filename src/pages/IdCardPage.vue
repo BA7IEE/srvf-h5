@@ -101,7 +101,7 @@ function buildOcrAdvice(result: OcrRecognizeResponse): string[] {
     advice.push('系统提示可能存在复印件、屏幕翻拍或修图痕迹，提交后可能进入人工复核。');
   }
   if (result.antiForgeryWarnings.length > 0) {
-    advice.push('证件照存在质量或防伪提醒，可继续提交，由后端按规则分流。');
+    advice.push('证件照存在质量提醒，可继续提交，由后端按规则分流。');
   }
   return Array.from(new Set(advice));
 }

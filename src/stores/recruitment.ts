@@ -12,9 +12,9 @@ interface DraftForm {
   realName: string;
   idCardNumber: string;
   phone: string;
-  code: string;
   token: string;
   tokenExpiresAt: string;
+  verifiedPhone: string;
   cityDistrict: string;
   detailedAddress: string;
   sourceChannel: string;
@@ -24,6 +24,7 @@ interface DraftForm {
 
 interface RecruitmentState {
   draft: DraftForm;
+  verificationClock: number;
   idCardFile: File | null;
   idCardPreviewUrl: string;
   ocr: OcrRecognizeResponse | null;
@@ -45,9 +46,9 @@ function defaultDraft(): DraftForm {
     realName: '',
     idCardNumber: '',
     phone: '',
-    code: '',
     token: '',
     tokenExpiresAt: '',
+    verifiedPhone: '',
     cityDistrict: '',
     detailedAddress: '',
     sourceChannel: 'offline_qr',
@@ -73,7 +74,15 @@ function defaultDraft(): DraftForm {
 function loadState(): RecruitmentState {
   const raw = sessionStorage.getItem(STORAGE_KEY);
   if (!raw) {
-    return { draft: defaultDraft(), idCardFile: null, idCardPreviewUrl: '', ocr: null, submitResult: null, progress: null };
+    return {
+      draft: defaultDraft(),
+      verificationClock: Date.now(),
+      idCardFile: null,
+      idCardPreviewUrl: '',
+      ocr: null,
+      submitResult: null,
+      progress: null,
+    };
   }
 
   try {
@@ -90,6 +99,7 @@ function loadState(): RecruitmentState {
           ...parsedDraft.profileExtra,
         },
       },
+      verificationClock: Date.now(),
       idCardFile: null,
       idCardPreviewUrl: '',
       ocr: null,
@@ -97,7 +107,15 @@ function loadState(): RecruitmentState {
       progress: null,
     };
   } catch {
-    return { draft: defaultDraft(), idCardFile: null, idCardPreviewUrl: '', ocr: null, submitResult: null, progress: null };
+    return {
+      draft: defaultDraft(),
+      verificationClock: Date.now(),
+      idCardFile: null,
+      idCardPreviewUrl: '',
+      ocr: null,
+      submitResult: null,
+      progress: null,
+    };
   }
 }
 
@@ -113,13 +131,24 @@ function persist(state: RecruitmentState): void {
 export const useRecruitmentStore = defineStore('recruitment', {
   state: (): RecruitmentState => loadState(),
   getters: {
-    hasVerifiedPhone: (state) => Boolean(state.draft.token),
+    hasVerifiedPhone: (state) => {
+      if (!state.draft.token || !state.draft.verifiedPhone || state.draft.verifiedPhone !== state.draft.phone.trim()) {
+        return false;
+      }
+      const expiresAt = Date.parse(state.draft.tokenExpiresAt);
+      return Number.isFinite(expiresAt) && expiresAt > state.verificationClock;
+    },
   },
   actions: {
+    refreshVerificationClock() {
+      this.verificationClock = Date.now();
+    },
     remember() {
       persist(this.$state);
     },
-    setToken(token: string, expiresAt: string) {
+    setToken(phone: string, token: string, expiresAt: string) {
+      this.refreshVerificationClock();
+      this.draft.verifiedPhone = phone;
       this.draft.token = token;
       this.draft.tokenExpiresAt = expiresAt;
       this.remember();

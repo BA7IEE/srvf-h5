@@ -7,6 +7,7 @@
 
     <div class="stack">
       <section class="panel stack">
+        <div class="notice">查询进度也需要短信验证，验证码发送受频率限制。</div>
         <van-cell-group inset>
           <van-field v-model="phone" label="手机号" type="tel" maxlength="11" placeholder="报名手机号" />
           <van-field v-model="code" label="验证码" type="tel" maxlength="6" placeholder="6 位数字">

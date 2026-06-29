@@ -55,20 +55,32 @@
 
       <div v-if="blockReason" class="notice warning">{{ blockReason }}</div>
       <div v-if="qualityNotice" class="notice">{{ qualityNotice }}</div>
-      <div v-if="mismatchReason" class="notice warning">{{ mismatchReason }}</div>
+      <div v-if="backendConfirmMode" class="notice warning">
+        后端核验结果与你填写的信息不一致，请选择处理方式。
+      </div>
+      <div v-else-if="precheckMismatchReason" class="notice">
+        {{ precheckMismatchReason }}
+      </div>
 
-      <div v-if="mismatchReason" class="stack">
-        <van-button block plain type="primary" @click="useOcr">使用识别结果</van-button>
+      <div v-if="backendConfirmMode" class="stack">
+        <van-button block plain type="primary" @click="useOcrAndResubmit">使用后端识别结果并重新提交</van-button>
         <van-button block plain type="primary" @click="editForm">修改填写</van-button>
         <van-button block type="primary" :loading="submitting" @click="submit(true)">
-          确认 OCR 识别有误，按我填写的信息提交
+          确认 OCR 识别有误，按我填写的信息提交人工复核
+        </van-button>
+      </div>
+      <div v-else-if="precheckMismatchReason" class="stack">
+        <van-button block plain type="primary" @click="useOcr">使用识别结果</van-button>
+        <van-button block plain type="primary" @click="editForm">返回修改</van-button>
+        <van-button block type="primary" :loading="submitting" @click="submit(false)">
+          继续提交，以后端最终核验为准
         </van-button>
       </div>
       <div v-else class="split-actions">
         <van-button block plain type="primary" @click="useOcr">使用识别结果</van-button>
         <van-button block plain type="primary" @click="editForm">修改填写</van-button>
       </div>
-      <div class="actions">
+      <div v-if="!backendConfirmMode && !precheckMismatchReason" class="actions">
         <van-button block type="primary" size="large" :loading="submitting" @click="submit(false)">
           提交报名
         </van-button>
@@ -93,6 +105,8 @@ const router = useRouter();
 const store = useRecruitmentStore();
 const draft = store.draft;
 const submitting = ref(false);
+
+store.refreshVerificationClock();
 
 const sourceLabels: Record<string, string> = {
   offline_qr: '线下二维码',
@@ -121,6 +135,7 @@ const relationLabels: Record<string, string> = {
 
 const recognizedName = computed(() => store.ocr?.recognized?.realName || '');
 const recognizedId = computed(() => normalizeIdCard(store.ocr?.recognized?.idCardNumber || ''));
+const backendConfirmMode = computed(() => store.submitResult?.outcome === 'confirm');
 const sourceText = computed(() => sourceLabels[draft.sourceChannel] || draft.sourceChannel || '未填写');
 const educationText = computed(() => educationLabels[draft.profileExtra.educationCode] || draft.profileExtra.educationCode || '未填写');
 const blockReason = computed(() => {
@@ -135,17 +150,40 @@ const blockReason = computed(() => {
   }
   return '';
 });
-const mismatchReason = computed(() => {
+const precheckMismatchReason = computed(() => {
   if (blockReason.value) return '';
   if (!sameText(recognizedName.value, draft.realName) || recognizedId.value !== normalizeIdCard(draft.idCardNumber)) {
-    return '识别结果与填写信息不一致，请选择处理方式。';
+    return '预识别结果与填写信息不一致，可先修正，也可继续提交并以后端最终核验为准。';
   }
   return '';
 });
 const qualityNotice = computed(() => {
-  const warnings = store.ocr?.antiForgeryWarnings ?? [];
-  if (warnings.length === 0) return '';
-  return '证件照存在质量或防伪提醒，可继续提交；后端会按招新分流规则处理，可能进入人工复核。';
+  const ocr = store.ocr;
+  const notices: string[] = [];
+  if (!ocr) return '';
+  if (ocr.antiForgeryWarnings.length > 0) {
+    notices.push('证件照有质量提醒');
+  }
+  const cardWarnings = ocr.ocrDetail?.cardWarnings;
+  if (
+    cardWarnings &&
+    (cardWarnings.copy || cardWarnings.reshoot || cardWarnings.ps || cardWarnings.border || cardWarnings.occlusion || cardWarnings.blur)
+  ) {
+    notices.push('照片边框、清晰度或拍摄方式需要注意');
+  }
+  const detailFields = [
+    ocr.ocrDetail?.sex,
+    ocr.ocrDetail?.nation,
+    ocr.ocrDetail?.birth,
+    ocr.ocrDetail?.address,
+    ocr.ocrDetail?.authority,
+    ocr.ocrDetail?.validDate,
+  ];
+  if (detailFields.some((field) => field?.reflect || field?.incomplete)) {
+    notices.push('部分证件字段存在反光或显示不完整');
+  }
+  if (notices.length === 0) return '';
+  return `${Array.from(new Set(notices)).join('；')}。可继续提交，后端会按招新分流规则处理。`;
 });
 
 function relationText(value: string) {
@@ -161,6 +199,11 @@ function useOcr() {
   }
   store.remember();
   showToast('已回填识别结果');
+}
+
+async function useOcrAndResubmit() {
+  useOcr();
+  await submit(false);
 }
 
 function editForm() {
@@ -187,12 +230,13 @@ function cleanProfileExtra(profile: RecruitmentProfileExtra): RecruitmentProfile
 }
 
 async function submit(applicantConfirmedOcrWrong: boolean) {
+  store.refreshVerificationClock();
   if (blockReason.value) {
     showToast(blockReason.value);
     return;
   }
-  if (mismatchReason.value && !applicantConfirmedOcrWrong) {
-    showToast('请先选择 OCR 不一致的处理方式');
+  if (applicantConfirmedOcrWrong && !backendConfirmMode.value) {
+    showToast('请先按后端核验结果选择处理方式');
     return;
   }
   if (!store.hasVerifiedPhone) {
