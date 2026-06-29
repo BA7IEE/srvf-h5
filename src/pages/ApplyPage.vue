@@ -175,7 +175,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { showToast } from 'vant';
 import { useRouter } from 'vue-router';
 
@@ -197,9 +197,11 @@ const sending = ref(false);
 const verifying = ref(false);
 const smsCode = ref('');
 const countdown = ref(0);
+const phoneChangedAfterVerification = ref(false);
 const relationPicker = ref({ show: false, index: 0 });
 const educationPicker = ref(false);
 let timer: number | null = null;
+let verificationTimer: number | null = null;
 
 const relationActions: OptionItem[] = [
   { name: '家人', value: 'family' },
@@ -228,6 +230,9 @@ const educationActions: OptionItem[] = [
 
 const sendDisabled = computed(() => sending.value || countdown.value > 0 || !isPhone(draft.phone));
 const phoneVerificationNotice = computed(() => {
+  if (phoneChangedAfterVerification.value) {
+    return '手机号已变更，请重新验证。';
+  }
   if (draft.verifiedPhone && draft.verifiedPhone !== draft.phone.trim()) {
     return '手机号已变更，请重新验证。';
   }
@@ -238,6 +243,20 @@ const phoneVerificationNotice = computed(() => {
 });
 
 store.refreshVerificationClock();
+verificationTimer = window.setInterval(() => {
+  store.refreshVerificationClock();
+}, 30000);
+
+watch(
+  () => draft.phone,
+  (phone) => {
+    if (draft.verifiedPhone && draft.verifiedPhone !== phone.trim()) {
+      store.clearToken();
+      phoneChangedAfterVerification.value = true;
+      showToast('手机号已变更，请重新验证');
+    }
+  },
+);
 
 function getMissingMessage(): string {
   if (!isPhone(draft.phone)) return '请填写正确手机号';
@@ -302,6 +321,7 @@ async function verifyCode() {
     const phone = draft.phone.trim();
     const result = await verifyRecruitmentCode(phone, smsCode.value.trim());
     store.setToken(phone, result.phoneVerificationToken, result.expiresAt);
+    phoneChangedAfterVerification.value = false;
     showToast('验证通过');
   } catch (error) {
     showToast(error instanceof FriendlyApiError ? error.message : '验证失败');
@@ -361,6 +381,9 @@ onBeforeUnmount(() => {
   store.remember();
   if (timer !== null) {
     window.clearInterval(timer);
+  }
+  if (verificationTimer !== null) {
+    window.clearInterval(verificationTimer);
   }
 });
 </script>

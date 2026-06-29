@@ -49,7 +49,7 @@
         {{
           store.hasVerifiedPhone
             ? '手机号身份链已就绪，可提交报名。'
-            : '当前只完成了资料核对；后端提交仍要求 phoneVerificationToken，请返回报名页完成手机号验证后提交。'
+            : phoneVerificationNotice
         }}
       </div>
 
@@ -63,7 +63,7 @@
       </div>
 
       <div v-if="backendConfirmMode" class="stack">
-        <van-button block plain type="primary" @click="useOcrAndResubmit">使用后端识别结果并重新提交</van-button>
+        <van-button block plain type="primary" @click="useOcrAndResubmit">使用后端识别结果并提交</van-button>
         <van-button block plain type="primary" @click="editForm">修改填写</van-button>
         <van-button block type="primary" :loading="submitting" @click="submit(true)">
           确认 OCR 识别有误，按我填写的信息提交人工复核
@@ -76,8 +76,7 @@
           继续提交，以后端最终核验为准
         </van-button>
       </div>
-      <div v-else class="split-actions">
-        <van-button block plain type="primary" @click="useOcr">使用识别结果</van-button>
+      <div v-else class="actions">
         <van-button block plain type="primary" @click="editForm">修改填写</van-button>
       </div>
       <div v-if="!backendConfirmMode && !precheckMismatchReason" class="actions">
@@ -90,7 +89,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { showToast } from 'vant';
 import { useRouter } from 'vue-router';
 
@@ -105,8 +104,24 @@ const router = useRouter();
 const store = useRecruitmentStore();
 const draft = store.draft;
 const submitting = ref(false);
+const phoneChangedAfterVerification = ref(false);
+let verificationTimer: number | null = null;
 
 store.refreshVerificationClock();
+verificationTimer = window.setInterval(() => {
+  store.refreshVerificationClock();
+}, 30000);
+
+watch(
+  () => draft.phone,
+  (phone) => {
+    if (draft.verifiedPhone && draft.verifiedPhone !== phone.trim()) {
+      store.clearToken();
+      phoneChangedAfterVerification.value = true;
+      showToast('手机号已变更，请重新验证');
+    }
+  },
+);
 
 const sourceLabels: Record<string, string> = {
   offline_qr: '线下二维码',
@@ -136,6 +151,15 @@ const relationLabels: Record<string, string> = {
 const recognizedName = computed(() => store.ocr?.recognized?.realName || '');
 const recognizedId = computed(() => normalizeIdCard(store.ocr?.recognized?.idCardNumber || ''));
 const backendConfirmMode = computed(() => store.submitResult?.outcome === 'confirm');
+const phoneVerificationNotice = computed(() => {
+  if (phoneChangedAfterVerification.value) {
+    return '手机号已变更，请返回报名页重新验证。';
+  }
+  if (draft.token && draft.verifiedPhone === draft.phone.trim()) {
+    return '手机验证已过期，请返回报名页重新获取验证码。';
+  }
+  return '提交前需要有效的手机号验证，请返回报名页完成验证。';
+});
 const sourceText = computed(() => sourceLabels[draft.sourceChannel] || draft.sourceChannel || '未填写');
 const educationText = computed(() => educationLabels[draft.profileExtra.educationCode] || draft.profileExtra.educationCode || '未填写');
 const blockReason = computed(() => {
@@ -207,6 +231,7 @@ async function useOcrAndResubmit() {
 }
 
 function editForm() {
+  store.clearSubmitResult();
   store.remember();
   router.push('/recruit/apply');
 }
@@ -278,6 +303,12 @@ async function submit(applicantConfirmedOcrWrong: boolean) {
     submitting.value = false;
   }
 }
+
+onBeforeUnmount(() => {
+  if (verificationTimer !== null) {
+    window.clearInterval(verificationTimer);
+  }
+});
 </script>
 
 <style scoped>

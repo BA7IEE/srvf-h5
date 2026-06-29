@@ -153,6 +153,13 @@ export const useRecruitmentStore = defineStore('recruitment', {
       this.draft.tokenExpiresAt = expiresAt;
       this.remember();
     },
+    clearToken() {
+      this.draft.token = '';
+      this.draft.tokenExpiresAt = '';
+      this.draft.verifiedPhone = '';
+      this.refreshVerificationClock();
+      this.remember();
+    },
     setImage(file: File, previewUrl: string) {
       if (this.idCardPreviewUrl.startsWith('blob:')) {
         window.URL.revokeObjectURL(this.idCardPreviewUrl);
@@ -167,6 +174,9 @@ export const useRecruitmentStore = defineStore('recruitment', {
     },
     setSubmitResult(result: RecruitmentSubmitResult) {
       this.submitResult = result;
+    },
+    clearSubmitResult() {
+      this.submitResult = null;
     },
     setProgress(progress: RecruitmentProgress) {
       this.progress = progress;
