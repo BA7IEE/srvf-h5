@@ -18,6 +18,7 @@
     <div class="actions">
       <van-button v-if="result?.outcome === 'retake'" block type="primary" size="large" @click="goRetake">重新拍摄</van-button>
       <van-button v-else-if="result?.outcome === 'confirm'" block type="primary" size="large" @click="goConfirm">返回核对</van-button>
+      <van-button v-else-if="result?.outcome === 'retry'" block type="primary" size="large" @click="goRetry">重新提交</van-button>
       <van-button v-else block type="primary" size="large" @click="goProgress">查询进度</van-button>
       <van-button block plain type="primary" @click="goHome">返回首页</van-button>
     </div>
@@ -66,7 +67,11 @@ function goConfirm() {
       ocrDetail: null,
     });
   }
-  router.push('/recruit/confirm');
+  router.push(store.idCardFile ? '/recruit/confirm' : '/recruit/id-card');
+}
+
+function goRetry() {
+  router.push(store.idCardFile ? '/recruit/confirm' : '/recruit/id-card');
 }
 
 function goProgress() {

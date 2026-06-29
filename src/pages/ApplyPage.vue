@@ -3,7 +3,7 @@
     <section class="hero">
       <p class="eyebrow">STEP 1 / 3</p>
       <h1 class="title">报名资料</h1>
-      <p class="subtitle">请按真实情况填写，新人报名会在身份证识别一致后提交。</p>
+      <p class="subtitle">当前仅支持大陆居民身份证报名。请先完成必要资料，选填项可后续补充。</p>
     </section>
 
     <div class="stack">
@@ -36,7 +36,7 @@
         <van-cell-group inset>
           <van-field v-model="draft.realName" label="姓名" placeholder="与身份证一致" />
           <van-field v-model="draft.idCardNumber" label="身份证号" maxlength="18" placeholder="18 位身份证号" />
-          <van-field model-value="大陆居民身份证" label="证件类型" readonly />
+          <van-field model-value="大陆居民身份证（当前仅支持）" label="证件类型" readonly />
           <van-field v-model="draft.cityDistrict" label="所在区县" placeholder="如 广州市天河区" />
           <van-field v-model="draft.detailedAddress" label="详细住址" type="textarea" rows="2" autosize placeholder="当前居住地址" />
         </van-cell-group>
@@ -61,14 +61,14 @@
       <section class="panel stack">
         <h2 class="section-title">基础情况</h2>
         <van-cell-group inset>
-          <van-field v-model="draft.profileExtra.occupation" label="职业" placeholder="如 学生 / 教师 / 医护 / 工程师" />
-          <van-field v-model="draft.profileExtra.workUnit" label="单位/学校" placeholder="工作单位或就读学校" />
+          <van-field v-model="draft.profileExtra.occupation" label="职业" placeholder="选填，如 学生 / 教师 / 医护 / 工程师" />
+          <van-field v-model="draft.profileExtra.workUnit" label="单位/学校" placeholder="选填，工作单位或就读学校" />
           <van-field
             :model-value="formatEducation(draft.profileExtra.educationCode)"
             label="学历"
             is-link
             readonly
-            placeholder="请选择"
+            placeholder="选填"
             @click="openEducationPicker"
           />
           <van-field
@@ -91,7 +91,7 @@
             type="textarea"
             rows="2"
             autosize
-            placeholder="跑步、登山、游泳、体能训练等；无则填无"
+            placeholder="选填，跑步、登山、游泳、体能训练等"
           />
           <van-field
             v-model="draft.profileExtra.firstAidExperience"
@@ -99,7 +99,7 @@
             type="textarea"
             rows="2"
             autosize
-            placeholder="急救证书、培训、实操经历；无则填无"
+            placeholder="选填，急救证书、培训、实操经历等"
           />
           <van-field
             v-model="draft.profileExtra.rescueExperience"
@@ -107,7 +107,7 @@
             type="textarea"
             rows="2"
             autosize
-            placeholder="救援、志愿服务、户外保障等；无则填无"
+            placeholder="选填，救援、志愿服务、户外保障等"
           />
           <van-field
             v-model="draft.profileExtra.availability"
@@ -123,7 +123,7 @@
             type="textarea"
             rows="2"
             autosize
-            placeholder="驾驶、摄影、无线电、后勤、文案等；无则填无"
+            placeholder="选填，驾驶、摄影、无线电、后勤、文案等"
           />
         </van-cell-group>
         <van-checkbox v-model="draft.profileExtra.hasVehicle" shape="square">
@@ -234,13 +234,7 @@ function getMissingMessage(): string {
   if (!draft.cityDistrict.trim()) return '请填写所在区县';
   if (!draft.detailedAddress.trim()) return '请填写详细住址';
   if (!draft.sourceChannel.trim()) return '请选择报名来源';
-  if (!draft.profileExtra.occupation.trim()) return '请填写职业';
-  if (!draft.profileExtra.workUnit.trim()) return '请填写单位或学校';
-  if (!draft.profileExtra.educationCode.trim()) return '请选择学历';
   if (!draft.profileExtra.medicalNotes.trim()) return '请填写健康说明，无则填无';
-  if (!draft.profileExtra.exerciseExperience.trim()) return '请填写运动经历，无则填无';
-  if (!draft.profileExtra.firstAidExperience.trim()) return '请填写急救经历，无则填无';
-  if (!draft.profileExtra.rescueExperience.trim()) return '请填写救援或志愿经历，无则填无';
   if (!draft.profileExtra.availability.trim()) return '请填写可参与时间';
 
   const invalidContactIndex = draft.emergencyContacts.findIndex(

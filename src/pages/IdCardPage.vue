@@ -3,6 +3,7 @@
     <section class="hero">
       <p class="eyebrow">STEP 2 / 3</p>
       <h1 class="title">身份证上传</h1>
+      <p class="subtitle">当前仅支持大陆居民身份证报名。照片刷新后不会保留，需要重新上传。</p>
     </section>
 
     <div class="stack">
@@ -15,13 +16,13 @@
           <van-button block plain type="primary" icon="photograph">选择照片</van-button>
         </van-uploader>
         <div v-if="ocrWarning" class="notice warning">{{ ocrWarning }}</div>
-        <div v-if="ocrAdvice.length > 0" class="notice warning">
+        <div v-if="ocrAdvice.length > 0" class="notice">
           <div v-for="item in ocrAdvice" :key="item">{{ item }}</div>
         </div>
       </section>
 
       <div class="actions">
-        <van-button block type="primary" size="large" :loading="recognizing" :disabled="!store.idCardImage" @click="runOcr">
+        <van-button block type="primary" size="large" :loading="recognizing" :disabled="!store.idCardFile" @click="runOcr">
           识别并核对
         </van-button>
       </div>
@@ -50,12 +51,12 @@ const store = useRecruitmentStore();
 const recognizing = ref(false);
 const ocrWarning = ref('');
 const ocrAdvice = ref<string[]>([]);
-const previewUrl = computed(() => store.idCardImage?.dataUrl || '');
+const previewUrl = computed(() => store.idCardPreviewUrl);
 
 function afterRead(item: UploadFileLike | UploadFileLike[]) {
   const upload = Array.isArray(item) ? item[0] : item;
   const file = upload.file;
-  if (!file || !upload.content) {
+  if (!file) {
     showToast('请选择图片文件');
     return;
   }
@@ -69,7 +70,7 @@ function afterRead(item: UploadFileLike | UploadFileLike[]) {
   }
   ocrWarning.value = '';
   ocrAdvice.value = [];
-  store.setImage(file, upload.content);
+  store.setImage(file, window.URL.createObjectURL(file));
 }
 
 function buildOcrAdvice(result: OcrRecognizeResponse): string[] {
@@ -85,19 +86,22 @@ function buildOcrAdvice(result: OcrRecognizeResponse): string[] {
   for (const [key, label] of fieldLabels) {
     const field = result.ocrDetail?.[key];
     if (field && typeof field === 'object' && 'reflect' in field && field.reflect) {
-      advice.push(`${label}有反光，请调整角度重拍。`);
+      advice.push(`${label}有反光，提交后可能进入人工复核。`);
     }
     if (field && typeof field === 'object' && 'incomplete' in field && field.incomplete) {
-      advice.push(`${label}不完整，请把证件边缘拍全。`);
+      advice.push(`${label}不完整，提交后可能进入人工复核。`);
     }
   }
 
   const cardWarnings = result.ocrDetail?.cardWarnings;
-  if (cardWarnings?.blur) advice.push('照片整体偏模糊，请重新对焦。');
-  if (cardWarnings?.border) advice.push('身份证边框不完整，请完整拍入画面。');
-  if (cardWarnings?.occlusion) advice.push('证件有遮挡，请移开手指或遮挡物。');
+  if (cardWarnings?.blur) advice.push('照片整体偏模糊，提交后可能进入人工复核。');
+  if (cardWarnings?.border) advice.push('身份证边框不完整，提交后可能进入人工复核。');
+  if (cardWarnings?.occlusion) advice.push('证件有遮挡，提交后可能进入人工复核。');
   if (cardWarnings?.copy || cardWarnings?.reshoot || cardWarnings?.ps) {
-    advice.push('请拍摄身份证原件，避免复印件、屏幕翻拍或修图痕迹。');
+    advice.push('系统提示可能存在复印件、屏幕翻拍或修图痕迹，提交后可能进入人工复核。');
+  }
+  if (result.antiForgeryWarnings.length > 0) {
+    advice.push('证件照存在质量或防伪提醒，可继续提交，由后端按规则分流。');
   }
   return Array.from(new Set(advice));
 }
@@ -118,8 +122,8 @@ async function runOcr() {
       ocrWarning.value = result.hint || '照片不清晰，请重拍后再继续。';
       return;
     }
-    if (result.antiForgeryWarnings.length > 0) {
-      ocrWarning.value = '照片质量未通过，请使用原件重新拍摄。';
+    if (!result.recognized?.realName || !result.recognized.idCardNumber) {
+      ocrWarning.value = result.hint || '未识别到姓名或身份证号，请重拍后再继续。';
       return;
     }
     router.push('/recruit/confirm');

@@ -22,15 +22,10 @@ interface DraftForm {
   profileExtra: RecruitmentProfileExtra;
 }
 
-interface StoredImage {
-  name: string;
-  type: string;
-  dataUrl: string;
-}
-
 interface RecruitmentState {
   draft: DraftForm;
-  idCardImage: StoredImage | null;
+  idCardFile: File | null;
+  idCardPreviewUrl: string;
   ocr: OcrRecognizeResponse | null;
   submitResult: RecruitmentSubmitResult | null;
   progress: RecruitmentProgress | null;
@@ -78,11 +73,11 @@ function defaultDraft(): DraftForm {
 function loadState(): RecruitmentState {
   const raw = sessionStorage.getItem(STORAGE_KEY);
   if (!raw) {
-    return { draft: defaultDraft(), idCardImage: null, ocr: null, submitResult: null, progress: null };
+    return { draft: defaultDraft(), idCardFile: null, idCardPreviewUrl: '', ocr: null, submitResult: null, progress: null };
   }
 
   try {
-    const parsed = JSON.parse(raw) as Partial<RecruitmentState>;
+    const parsed = JSON.parse(raw) as { draft?: Partial<DraftForm> };
     const defaults = defaultDraft();
     const parsedDraft = (parsed.draft ?? {}) as Partial<DraftForm>;
     return {
@@ -95,13 +90,14 @@ function loadState(): RecruitmentState {
           ...parsedDraft.profileExtra,
         },
       },
-      idCardImage: parsed.idCardImage ?? null,
-      ocr: parsed.ocr ?? null,
-      submitResult: parsed.submitResult ?? null,
-      progress: parsed.progress ?? null,
+      idCardFile: null,
+      idCardPreviewUrl: '',
+      ocr: null,
+      submitResult: null,
+      progress: null,
     };
   } catch {
-    return { draft: defaultDraft(), idCardImage: null, ocr: null, submitResult: null, progress: null };
+    return { draft: defaultDraft(), idCardFile: null, idCardPreviewUrl: '', ocr: null, submitResult: null, progress: null };
   }
 }
 
@@ -110,30 +106,14 @@ function persist(state: RecruitmentState): void {
     STORAGE_KEY,
     JSON.stringify({
       draft: state.draft,
-      idCardImage: state.idCardImage,
-      ocr: state.ocr,
-      submitResult: state.submitResult,
-      progress: state.progress,
     }),
   );
-}
-
-function dataUrlToFile(image: StoredImage): File {
-  const [header, base64] = image.dataUrl.split(',');
-  const mime = header.match(/data:(.*);base64/)?.[1] || image.type || 'image/jpeg';
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return new File([bytes], image.name, { type: mime });
 }
 
 export const useRecruitmentStore = defineStore('recruitment', {
   state: (): RecruitmentState => loadState(),
   getters: {
     hasVerifiedPhone: (state) => Boolean(state.draft.token),
-    idCardFile: (state): File | null => (state.idCardImage ? dataUrlToFile(state.idCardImage) : null),
   },
   actions: {
     remember() {
@@ -144,29 +124,37 @@ export const useRecruitmentStore = defineStore('recruitment', {
       this.draft.tokenExpiresAt = expiresAt;
       this.remember();
     },
-    setImage(file: File, dataUrl: string) {
-      this.idCardImage = { name: file.name, type: file.type, dataUrl };
+    setImage(file: File, previewUrl: string) {
+      if (this.idCardPreviewUrl.startsWith('blob:')) {
+        window.URL.revokeObjectURL(this.idCardPreviewUrl);
+      }
+      this.idCardFile = file;
+      this.idCardPreviewUrl = previewUrl;
       this.ocr = null;
       this.submitResult = null;
-      this.remember();
     },
     setOcr(ocr: OcrRecognizeResponse) {
       this.ocr = ocr;
-      this.remember();
     },
     setSubmitResult(result: RecruitmentSubmitResult) {
       this.submitResult = result;
-      this.remember();
     },
     setProgress(progress: RecruitmentProgress) {
       this.progress = progress;
-      this.remember();
+    },
+    clearProgress() {
+      this.progress = null;
     },
     clearApplication() {
+      if (this.idCardPreviewUrl.startsWith('blob:')) {
+        window.URL.revokeObjectURL(this.idCardPreviewUrl);
+      }
       this.draft = defaultDraft();
-      this.idCardImage = null;
+      this.idCardFile = null;
+      this.idCardPreviewUrl = '';
       this.ocr = null;
       this.submitResult = null;
+      this.progress = null;
       this.remember();
     },
   },

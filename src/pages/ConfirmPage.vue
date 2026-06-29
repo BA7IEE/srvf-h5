@@ -54,13 +54,22 @@
       </div>
 
       <div v-if="blockReason" class="notice warning">{{ blockReason }}</div>
+      <div v-if="qualityNotice" class="notice">{{ qualityNotice }}</div>
+      <div v-if="mismatchReason" class="notice warning">{{ mismatchReason }}</div>
 
-      <div class="split-actions">
+      <div v-if="mismatchReason" class="stack">
+        <van-button block plain type="primary" @click="useOcr">使用识别结果</van-button>
+        <van-button block plain type="primary" @click="editForm">修改填写</van-button>
+        <van-button block type="primary" :loading="submitting" @click="submit(true)">
+          确认 OCR 识别有误，按我填写的信息提交
+        </van-button>
+      </div>
+      <div v-else class="split-actions">
         <van-button block plain type="primary" @click="useOcr">使用识别结果</van-button>
         <van-button block plain type="primary" @click="editForm">修改填写</van-button>
       </div>
       <div class="actions">
-        <van-button block type="primary" size="large" :loading="submitting" @click="submit">
+        <van-button block type="primary" size="large" :loading="submitting" @click="submit(false)">
           提交报名
         </van-button>
       </div>
@@ -121,16 +130,22 @@ const blockReason = computed(() => {
   if (!store.ocr.clarityOk) {
     return '照片不清晰，请返回重拍。';
   }
-  if (store.ocr.antiForgeryWarnings.length > 0) {
-    return '照片质量未通过，请返回重拍。';
-  }
   if (!recognizedName.value || !recognizedId.value) {
     return '识别结果不完整，请返回重拍。';
   }
+  return '';
+});
+const mismatchReason = computed(() => {
+  if (blockReason.value) return '';
   if (!sameText(recognizedName.value, draft.realName) || recognizedId.value !== normalizeIdCard(draft.idCardNumber)) {
-    return '识别结果与填写信息不一致，请先使用识别结果或返回修改。';
+    return '识别结果与填写信息不一致，请选择处理方式。';
   }
   return '';
+});
+const qualityNotice = computed(() => {
+  const warnings = store.ocr?.antiForgeryWarnings ?? [];
+  if (warnings.length === 0) return '';
+  return '证件照存在质量或防伪提醒，可继续提交；后端会按招新分流规则处理，可能进入人工复核。';
 });
 
 function relationText(value: string) {
@@ -171,9 +186,13 @@ function cleanProfileExtra(profile: RecruitmentProfileExtra): RecruitmentProfile
   };
 }
 
-async function submit() {
+async function submit(applicantConfirmedOcrWrong: boolean) {
   if (blockReason.value) {
     showToast(blockReason.value);
+    return;
+  }
+  if (mismatchReason.value && !applicantConfirmedOcrWrong) {
+    showToast('请先选择 OCR 不一致的处理方式');
     return;
   }
   if (!store.hasVerifiedPhone) {
@@ -204,6 +223,7 @@ async function submit() {
         phone: contact.phone.trim(),
       })),
       profileExtra: cleanProfileExtra(draft.profileExtra),
+      ...(applicantConfirmedOcrWrong ? { applicantConfirmedOcrWrong: true } : {}),
     };
     const result = await submitRecruitment(payload, file);
     store.setSubmitResult(result);

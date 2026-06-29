@@ -43,7 +43,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { showToast } from 'vant';
 
 import { queryProgressByPhone, sendRecruitmentCode } from '@/api/recruitment';
@@ -63,6 +63,10 @@ let timer: number | null = null;
 const progress = computed(() => store.progress);
 const sendDisabled = computed(() => sending.value || countdown.value > 0 || !isPhone(phone.value));
 const canQuery = computed(() => isPhone(phone.value) && isSmsCode(code.value));
+
+watch(phone, () => {
+  store.clearProgress();
+});
 
 function startCountdown(seconds: number) {
   countdown.value = seconds;
@@ -101,6 +105,7 @@ async function query() {
     return;
   }
   querying.value = true;
+  store.clearProgress();
   try {
     const result = await queryProgressByPhone(phone.value.trim(), code.value.trim());
     store.setProgress(result);
