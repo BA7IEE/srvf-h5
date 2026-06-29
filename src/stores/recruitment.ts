@@ -178,6 +178,22 @@ export const useRecruitmentStore = defineStore('recruitment', {
     clearSubmitResult() {
       this.submitResult = null;
     },
+    clearSensitiveDraftAfterSubmitted() {
+      if (this.idCardPreviewUrl.startsWith('blob:')) {
+        window.URL.revokeObjectURL(this.idCardPreviewUrl);
+      }
+      this.draft.token = '';
+      this.draft.tokenExpiresAt = '';
+      this.draft.verifiedPhone = '';
+      this.draft.idCardNumber = '';
+      this.draft.detailedAddress = '';
+      this.draft.emergencyContacts = defaultContacts();
+      this.idCardFile = null;
+      this.idCardPreviewUrl = '';
+      this.ocr = null;
+      this.refreshVerificationClock();
+      this.remember();
+    },
     setProgress(progress: RecruitmentProgress) {
       this.progress = progress;
     },

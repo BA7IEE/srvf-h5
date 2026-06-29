@@ -166,6 +166,9 @@ const phoneVerificationNotice = computed(() => {
 const sourceText = computed(() => sourceLabels[draft.sourceChannel] || draft.sourceChannel || '未填写');
 const educationText = computed(() => educationLabels[draft.profileExtra.educationCode] || draft.profileExtra.educationCode || '未填写');
 const blockReason = computed(() => {
+  if (backendConfirmMode.value) {
+    return recognizedName.value && recognizedId.value ? '' : '后端核验结果不完整，请重新提交或返回修改。';
+  }
   if (!store.ocr) {
     return '请先完成身份证识别。';
   }
@@ -258,6 +261,7 @@ function cleanProfileExtra(profile: RecruitmentProfileExtra): RecruitmentProfile
 }
 
 async function submit(applicantConfirmedOcrWrong: boolean) {
+  if (submitting.value) return;
   store.refreshVerificationClock();
   if (blockReason.value) {
     showToast(blockReason.value);
@@ -299,6 +303,9 @@ async function submit(applicantConfirmedOcrWrong: boolean) {
     };
     const result = await submitRecruitment(payload, file);
     store.setSubmitResult(result);
+    if (result.outcome === 'submitted') {
+      store.clearSensitiveDraftAfterSubmitted();
+    }
     router.push('/recruit/result');
   } catch (error) {
     showToast(error instanceof FriendlyApiError ? error.message : '提交失败');

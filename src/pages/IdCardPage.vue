@@ -98,7 +98,7 @@ function buildOcrAdvice(result: OcrRecognizeResponse): string[] {
   if (cardWarnings?.border) advice.push('身份证边框不完整，提交后可能进入人工复核。');
   if (cardWarnings?.occlusion) advice.push('证件有遮挡，提交后可能进入人工复核。');
   if (cardWarnings?.copy || cardWarnings?.reshoot || cardWarnings?.ps) {
-    advice.push('系统提示可能存在复印件、屏幕翻拍或修图痕迹，提交后可能进入人工复核。');
+    advice.push('证件照拍摄方式存在质量提醒，提交后可能进入人工复核。');
   }
   if (result.antiForgeryWarnings.length > 0) {
     advice.push('证件照存在质量提醒，可继续提交，由后端按规则分流。');
@@ -107,6 +107,7 @@ function buildOcrAdvice(result: OcrRecognizeResponse): string[] {
 }
 
 async function runOcr() {
+  if (recognizing.value) return;
   const file = store.idCardFile;
   if (!file) {
     showToast('请先选择照片');

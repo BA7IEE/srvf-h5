@@ -295,6 +295,7 @@ function startCountdown(seconds: number) {
 }
 
 async function sendCode() {
+  if (sending.value) return;
   if (!isPhone(draft.phone)) {
     showToast('请输入正确手机号');
     return;
@@ -312,6 +313,7 @@ async function sendCode() {
 }
 
 async function verifyCode() {
+  if (verifying.value) return;
   if (!isPhone(draft.phone) || !isSmsCode(smsCode.value)) {
     showToast('请输入手机号和 6 位验证码');
     return;
