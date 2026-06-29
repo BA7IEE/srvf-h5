@@ -148,9 +148,12 @@ const relationLabels: Record<string, string> = {
   other: '其他',
 };
 
-const recognizedName = computed(() => store.ocr?.recognized?.realName || '');
-const recognizedId = computed(() => normalizeIdCard(store.ocr?.recognized?.idCardNumber || ''));
 const backendConfirmMode = computed(() => store.submitResult?.outcome === 'confirm');
+const recognizedFields = computed(() =>
+  backendConfirmMode.value && store.submitResult?.recognized ? store.submitResult.recognized : store.ocr?.recognized,
+);
+const recognizedName = computed(() => recognizedFields.value?.realName || '');
+const recognizedId = computed(() => normalizeIdCard(recognizedFields.value?.idCardNumber || ''));
 const phoneVerificationNotice = computed(() => {
   if (phoneChangedAfterVerification.value) {
     return '手机号已变更，请返回报名页重新验证。';
